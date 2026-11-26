@@ -97,6 +97,21 @@ function mount(app, { cfg, port }) {
     res.json({ ok: true });
   });
 
+  // Diagnóstico: descarga lo que el cliente está entregando ahora mismo,
+  // para revisar modos de juego nuevos o raros. No incluye el código secreto.
+  app.get('/setup/debug', onlyLocal, async (req, res) => {
+    const grab = async (fn) => { try { return await fn(); } catch (e) { return { error: e.message }; } };
+    const data = {
+      generado: new Date().toISOString(),
+      phase: await grab(() => lcu.get('/lol-gameflow/v1/gameflow-phase')),
+      gameflow: await grab(() => lcu.get('/lol-gameflow/v1/session')),
+      champSelect: await grab(() => lcu.get('/lol-champ-select/v1/session')),
+      live: await grab(() => require('./live').summary()),
+    };
+    res.set('Content-Disposition', 'attachment; filename="lolremote-diagnostico.json"');
+    res.json(data);
+  });
+
   // Notificaciones
   app.post('/setup/ntfy/toggle', onlyLocal, needHeader, (req, res) => {
     cfg.ntfyEnabled = !cfg.ntfyEnabled;

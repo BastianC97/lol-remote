@@ -10,6 +10,7 @@ const lcu = require('./lcu');
 const config = require('./config');
 const setup = require('./setup');
 const notifier = require('./notifier');
+const live = require('./live');
 
 const PORT = Number(process.env.PORT) || 3000;
 const cfg = config.load();
@@ -125,6 +126,20 @@ function summarizeSession(s) {
 
   const mine = (s.myTeam || []).find((p) => p.cellId === me);
 
+  // Intercambios que ofrece el cliente (cada modo usa los suyos):
+  //  - trades:          cambiar campeón con un aliado (ARAM, Draft después de elegir)
+  //  - pickOrderSwaps:  cambiar el orden de pick
+  //  - positionSwaps:   cambiar de rol
+  // state: AVAILABLE (se puede pedir), SENT (lo pedí yo), RECEIVED (me lo pidieron), BUSY, INVALID...
+  const swaps = [];
+  for (const [kind, list] of [['trades', s.trades], ['swaps', s.pickOrderSwaps], ['position-swaps', s.positionSwaps]]) {
+    for (const t of list || []) {
+      if (['AVAILABLE', 'SENT', 'RECEIVED'].includes(t.state)) {
+        swaps.push({ kind, id: t.id, cellId: t.cellId, state: t.state });
+      }
+    }
+  }
+
   return {
     timerPhase: s.timer?.phase,                       // PLANNING, BAN_PICK, FINALIZATION
     timeLeftMs: s.timer?.adjustedTimeLeftInPhase ?? 0,
@@ -134,7 +149,14 @@ function summarizeSession(s) {
     myTurn: active ? { id: active.id, type: active.type, championId: active.championId } : null,
     pendingPickId: pendingPick?.id ?? null,
     mySpells: mine ? [mine.spell1Id, mine.spell2Id] : [0, 0],
-    benchEnabled: !!s.benchEnabled,
+    myChampionId: mine?.championId || 0,
+    // ¿Este modo me deja elegir/banear con la grilla? (ARAM, por ejemplo, no)
+    hasActions: actions.some((a) => a.actorCellId === me && !a.completed),
+    // ARAM y modos aleatorios: banca y reroll
+    bench: s.benchEnabled ? (s.benchChampions || []).map((b) => b.championId).filter(Boolean) : null,
+    allowRerolling: !!s.allowRerolling,
+    rerollsRemaining: s.rerollsRemaining ?? 0,
+    swaps,
   };
 }
 
@@ -242,6 +264,28 @@ app.post('/api/runes', handle((req) => {
   const id = Number(req.body?.id);
   return act('PUT', '/lol-perks/v1/currentpage', id);
 }));
+
+// ARAM: tomar un campeón de la banca
+app.post('/api/bench', handle((req) => {
+  const id = Number(req.body?.championId);
+  if (!Number.isInteger(id)) throw new Error('championId inválido');
+  return act('POST', `/lol-champ-select/v1/session/bench/swap/${id}`);
+}));
+
+// ARAM: reroll (dado)
+app.post('/api/reroll', handle(() => act('POST', '/lol-champ-select/v1/session/my-selection/reroll')));
+
+// Intercambios: { kind: trades|swaps|position-swaps, id, action: request|accept|decline|cancel }
+app.post('/api/swap', handle((req) => {
+  const { kind, id, action } = req.body || {};
+  if (!['trades', 'swaps', 'position-swaps'].includes(kind)) throw new Error('Tipo inválido');
+  if (!['request', 'accept', 'decline', 'cancel'].includes(action)) throw new Error('Acción inválida');
+  if (!Number.isInteger(id)) throw new Error('id inválido');
+  return act('POST', `/lol-champ-select/v1/session/${kind}/${id}/${action}`);
+}));
+
+// Estadísticas de la partida en curso (API oficial del juego, puerto 2999)
+app.get('/api/live', handle(() => live.summary()));
 
 const server = app.listen(PORT, '0.0.0.0', () => {
   const setupUrl = `http://localhost:${PORT}/setup`;

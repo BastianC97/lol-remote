@@ -45,7 +45,7 @@ async function run(fn) {
 }
 
 // ---------- Vistas ----------
-const views = ['pin-view', 'idle-view', 'ready-view', 'cs-view', 'other-view'];
+const views = ['pin-view', 'idle-view', 'ready-view', 'cs-view', 'live-view', 'other-view'];
 function showView(id) { views.forEach((v) => ($(v).hidden = v !== id)); }
 
 $('pin-save').onclick = () => {
@@ -95,7 +95,9 @@ async function loadRunes() {
 
 // ---------- Ciclo principal ----------
 let prevPhase = null;
+let tickCount = 0;
 async function tick() {
+  tickCount += 1;
   let state;
   try {
     state = await api('/state');
@@ -161,8 +163,9 @@ async function tick() {
       showView('cs-view');
       break;
     case 'InProgress':
-      $('other-text').textContent = '🎮 Partida en curso. ¡Ve al PC!';
-      showView('other-view');
+      showView('live-view');
+      // Las estadísticas se piden cada 2 s
+      if (entered || !(tickCount % 2)) run(loadLive);
       break;
     default:
       $('other-text').textContent = `Fase: ${state.phase}`;
@@ -234,8 +237,15 @@ function renderChampSelect(state) {
     }
   }
 
-  renderTeam($('team-ally'), cs.myTeam, true);
-  renderTeam($('team-enemy'), cs.theirTeam, false);
+  renderModeUi(cs);
+  renderSwaps(cs);
+
+  renderTeam($('team-ally'), cs.myTeam, true, cs.swaps);
+  renderTeam($('team-enemy'), cs.theirTeam, false, []);
+  // Modos sin equipo enemigo visible o sin bans (ARAM, Arena...)
+  $('enemy-col').hidden = !cs.theirTeam.length;
+  $('teams').style.gridTemplateColumns = cs.theirTeam.length ? '' : '1fr';
+  $('bans').hidden = !cs.bans.ally.length && !cs.bans.enemy.length && !cs.myTurn;
   $('bans-ally').innerHTML = cs.bans.ally.map((id) => `<img src="${champImg(id)}">`).join('') || '—';
   $('bans-enemy').innerHTML = cs.bans.enemy.map((id) => `<img src="${champImg(id)}">`).join('') || '—';
 
@@ -245,7 +255,7 @@ function renderChampSelect(state) {
 const champName = (id) => champions.find((c) => c.id === id)?.name || '';
 const spellIcon = (id) => spells.find((s) => s.id === id)?.iconPath;
 
-function renderTeam(ul, team, isAlly) {
+function renderTeam(ul, team, isAlly, swaps) {
   ul.innerHTML = team.map((p) => {
     const id = p.championId || p.intentId;
     const pic = id
@@ -255,9 +265,15 @@ function renderTeam(ul, team, isAlly) {
       ? [p.spell1Id, p.spell2Id].map((s) => (spellIcon(s) ? `<img class="spell" src="${img(spellIcon(s))}">` : '')).join('')
       : '';
     const label = [POS[p.position] || '', champName(id)].filter(Boolean).join(' · ');
+    // Botones de intercambio con este aliado (lo que el cliente ofrezca)
+    const btns = (swaps || []).filter((w) => w.cellId === p.cellId && w.state !== 'RECEIVED').map((w) => {
+      const sent = w.state === 'SENT';
+      return `<button class="swap-btn ${sent ? 'sent' : ''}" data-kind="${w.kind}" data-id="${w.id}"
+        data-action="${sent ? 'cancel' : 'request'}">${sent ? 'Cancelar' : SWAP_LABEL[w.kind]}</button>`;
+    }).join(' ');
     return `<li class="${p.isMe ? 'me' : ''}">${pic}<div class="info">
       <span>${p.isMe ? 'Tú' : escapeHtml(p.name) || (isAlly ? 'Aliado' : 'Enemigo')}</span>
-      <small>${escapeHtml(label) || '…'}</small><div>${sp}</div></div></li>`;
+      <small>${escapeHtml(label) || '…'}</small><div>${sp}</div>${btns ? `<div>${btns}</div>` : ''}</div></li>`;
   }).join('');
 }
 
@@ -314,6 +330,131 @@ $('champ-lock').onclick = () => run(async () => {
   toast(`${champName(selectedId)} ${isBan ? 'baneado' : 'confirmado'}`);
 });
 
+// ---------- ARAM / modos sin turnos ----------
+const SWAP_LABEL = { trades: '⇄ Cambiar campeón', swaps: '⇅ Cambiar orden', 'position-swaps': '⇄ Cambiar rol' };
+
+function renderModeUi(cs) {
+  const aram = !!cs.bench;
+  $('aram').hidden = !aram;
+  // La grilla solo sirve si tengo pick/ban en este modo
+  $('picker').hidden = !cs.hasActions;
+  $('champ-bar').hidden = !cs.hasActions || $('tab-champs').hidden;
+  $('no-actions').hidden = cs.hasActions || aram;
+
+  if (aram) {
+    const id = cs.myChampionId;
+    $('my-champ-img').src = id ? champImg(id) : '';
+    $('my-champ-name').textContent = champName(id) || '—';
+    $('reroll').hidden = !cs.allowRerolling;
+    $('reroll-count').textContent = `(${cs.rerollsRemaining})`;
+    $('reroll').disabled = cs.rerollsRemaining <= 0;
+
+    const key = cs.bench.join(',') + '|' + champions.length;
+    if (key !== renderModeUi.benchKey) {
+      renderModeUi.benchKey = key;
+      $('bench-grid').innerHTML = cs.bench.length
+        ? cs.bench.map((b) => `<button data-bench="${b}"><img src="${champImg(b)}"><span>${escapeHtml(champName(b))}</span></button>`).join('')
+        : '<p class="muted">La banca está vacía.</p>';
+    }
+  }
+}
+
+$('bench-grid').onclick = (e) => {
+  const b = e.target.closest('[data-bench]');
+  if (!b) return;
+  const id = Number(b.dataset.bench);
+  run(async () => {
+    await api('/bench', { championId: id });
+    toast(`Cambiaste a ${champName(id)}`);
+  });
+};
+$('reroll').onclick = () => run(async () => { await api('/reroll', {}); toast('🎲 Reroll'); });
+
+// Solicitudes que me hicieron otros jugadores
+function renderSwaps(cs) {
+  const incoming = cs.swaps.filter((w) => w.state === 'RECEIVED');
+  const key = incoming.map((w) => w.kind + w.id).join(',') + '|' + champions.length;
+  if (key === renderSwaps.key) return;
+  renderSwaps.key = key;
+  $('swap-incoming').innerHTML = incoming.map((w) => {
+    const p = cs.myTeam.find((x) => x.cellId === w.cellId);
+    const who = escapeHtml(p?.name || 'Un aliado');
+    const what = w.kind === 'trades'
+      ? `quiere cambiar su <b>${escapeHtml(champName(p?.championId) || 'campeón')}</b> por el tuyo`
+      : w.kind === 'swaps' ? 'quiere cambiar el orden de pick contigo' : 'quiere cambiar de rol contigo';
+    return `<div class="incoming">🔄 <b>${who}</b> ${what}
+      <div class="row">
+        <button class="btn primary" data-kind="${w.kind}" data-id="${w.id}" data-action="accept">Aceptar</button>
+        <button class="btn" data-kind="${w.kind}" data-id="${w.id}" data-action="decline">Rechazar</button>
+      </div></div>`;
+  }).join('');
+  if (incoming.length) try { navigator.vibrate?.(200); } catch { /* sin vibración */ }
+}
+
+// Un solo manejador para todos los botones de intercambio
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-kind][data-action]');
+  if (!b) return;
+  const body = { kind: b.dataset.kind, id: Number(b.dataset.id), action: b.dataset.action };
+  run(async () => {
+    await api('/swap', body);
+    toast({ request: 'Solicitud enviada', accept: 'Intercambio aceptado', decline: 'Rechazado', cancel: 'Cancelado' }[body.action]);
+    renderSwaps.key = null;
+  });
+});
+
+// ---------- En partida ----------
+async function loadLive() {
+  const d = await api('/live');
+  $('live-loading').hidden = d.inGame;
+  $('live').hidden = !d.inGame;
+  if (!d.inGame) return;
+
+  $('live-time').textContent = fmt(d.time);
+  $('ally-kills').textContent = d.ally.kills;
+  $('enemy-kills').textContent = d.enemy.kills;
+  $('live-result').hidden = !d.result;
+  if (d.result) $('live-result').textContent = d.result === 'Win' ? '🏆 ¡Victoria!' : 'Derrota';
+
+  const objs = (t) => {
+    const parts = [];
+    parts.push(`🗼 ${t.towers} torres`);
+    if (t.dragons.length) parts.push(`🐉 ${t.dragons.length} dragones`);
+    if (t.grubs) parts.push(`🪲 ${t.grubs} larvas`);
+    if (t.heralds) parts.push(`👁️ ${t.heralds} heraldo`);
+    if (t.barons) parts.push(`🟣 ${t.barons} barón`);
+    if (t.inhibs) parts.push(`🏛️ ${t.inhibs} inhib.`);
+    return parts.join('<br>');
+  };
+  $('obj-ally').innerHTML = objs(d.ally);
+  $('obj-enemy').innerHTML = objs(d.enemy);
+
+  const st = d.me.stats;
+  $('me-box').innerHTML = `<div><span class="gold">💰 ${d.me.gold}</span> &nbsp; Nivel ${d.me.level ?? '-'} · ❤️ ${st.hp}</div>
+    <div class="stats">
+      <span>AD <b>${st.ad}</b></span><span>AP <b>${st.ap}</b></span><span>Vel. at. <b>${st.as}</b></span>
+      <span>Armadura <b>${st.armor}</b></span><span>Res. mág. <b>${st.mr}</b></span><span>Celeridad <b>${st.haste}</b></span>
+      <span>Crítico <b>${st.crit}%</b></span><span>Vel. mov. <b>${st.ms}</b></span>
+    </div>`;
+
+  const row = (p) => {
+    const items = Array.from({ length: 7 }, (_, i) => {
+      const it = p.items[i];
+      return it?.icon ? `<img src="${img(it.icon)}" title="${escapeHtml(it.name)}">` : '<span></span>';
+    }).join('');
+    const pic = p.championId ? `<img class="champ" src="${champImg(p.championId)}">` : '<span class="champ-empty"></span>';
+    return `<li class="${p.isMe ? 'me' : ''} ${p.isDead ? 'dead' : ''}">${pic}
+      <div class="who"><div>${p.isMe ? 'Tú' : escapeHtml(p.name)} <small>Nv ${p.level}${p.isDead ? ` · ☠️ ${p.respawn}s` : ''}</small></div>
+        <div class="items">${items}</div></div>
+      <div class="kda">${p.kills}/${p.deaths}/${p.assists}<small>${p.cs} CS</small></div></li>`;
+  };
+  $('live-ally').innerHTML = d.ally.players.map(row).join('');
+  $('live-enemy').innerHTML = d.enemy.players.map(row).join('');
+  $('live-feed').innerHTML = d.feed.length
+    ? d.feed.map((f) => `<li class="${f.ally ? 'ally' : ''}"><small>${fmt(Math.floor(f.t))}</small>${escapeHtml(f.text)}</li>`).join('')
+    : '<li class="ally"><small>—</small>Todavía no pasa nada</li>';
+}
+
 // ---------- Hechizos ----------
 function renderSpells() {
   const mode = lastState?.gameMode || 'CLASSIC';
@@ -352,7 +493,7 @@ document.querySelectorAll('.tabs button').forEach((btn) => {
   btn.onclick = () => {
     document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('active', b === btn));
     ['champs', 'spells', 'runes'].forEach((t) => ($('tab-' + t).hidden = t !== btn.dataset.tab));
-    $('champ-lock').parentElement.hidden = btn.dataset.tab !== 'champs';
+    $('champ-bar').hidden = btn.dataset.tab !== 'champs' || !lastState?.champSelect?.hasActions;
     if (btn.dataset.tab === 'runes') run(loadRunes);
   };
 });

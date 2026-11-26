@@ -19,14 +19,17 @@ CÓMO USARLO
    - En ntfy toca "+", escribe el tema que aparece en la página
      (empieza con "lolr-") y toca "Subscribe". Permite las notificaciones.
    - Pulsa "Enviar notificación de prueba" para comprobar que llega.
-   Así te avisa cuando encuentra partida y cuando es tu turno,
+   Así te avisa cuando encuentra partida, cuando es tu turno y
+   cuando termina la pantalla de carga,
    aunque tengas el celular bloqueado.
 
 5. ¡Listo! En el celular puedes:
    - Buscar partida y aceptarla
-   - Elegir y banear campeones
+   - Elegir y banear campeones (en ARAM: banca, reroll e intercambios)
    - Cambiar hechizos de invocador y página de runas
    - Ver lo que eligió cada jugador
+   - Ver las estadísticas durante la partida (marcador, objetivos,
+     K/D/A, farm e ítems de cada jugador, y tu oro y stats)
 
 CONSEJOS
 

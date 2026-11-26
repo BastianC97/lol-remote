@@ -52,11 +52,14 @@
     </div>
     <div id="cs-turn" class="turn" hidden></div>
 
-    <div class="teams">
+    <!-- Me pidieron un intercambio -->
+    <div id="swap-incoming"></div>
+
+    <div class="teams" id="teams">
       <div><h3>Tu equipo</h3><ul id="team-ally"></ul></div>
-      <div><h3>Enemigos</h3><ul id="team-enemy"></ul></div>
+      <div id="enemy-col"><h3>Enemigos</h3><ul id="team-enemy"></ul></div>
     </div>
-    <div class="bans">
+    <div class="bans" id="bans">
       <div>Bans aliados: <span id="bans-ally"></span></div>
       <div>Bans enemigos: <span id="bans-enemy"></span></div>
     </div>
@@ -68,9 +71,26 @@
     </nav>
 
     <div id="tab-champs" class="tab">
+      <!-- ARAM y modos aleatorios -->
+      <div id="aram" hidden>
+        <div class="my-champ">
+          <img id="my-champ-img" alt="">
+          <div>
+            <small>Tu campeón</small>
+            <strong id="my-champ-name">—</strong>
+          </div>
+          <button id="reroll" class="btn">🎲 Reroll <span id="reroll-count"></span></button>
+        </div>
+        <h3>Banca · toca para cambiar</h3>
+        <div id="bench-grid" class="grid small bench"></div>
+      </div>
+
+      <div id="picker">
       <input id="champ-search" type="search" placeholder="Buscar campeón…">
       <div id="champ-grid" class="grid"></div>
-      <div class="sticky-bar">
+      </div>
+      <p id="no-actions" class="muted" hidden>En este modo no eliges campeón con turnos. Puedes cambiar hechizos y runas en las otras pestañas.</p>
+      <div class="sticky-bar" id="champ-bar">
         <span id="champ-selected">Ninguno seleccionado</span>
         <button id="champ-lock" class="btn primary" disabled>Confirmar</button>
       </div>
@@ -90,7 +110,34 @@
     </div>
   </section>
 
-  <!-- En partida u otra fase -->
+  <!-- En partida: estadísticas en vivo -->
+  <section id="live-view" hidden>
+    <div id="live-loading" class="muted">⏳ Pantalla de carga… te aviso cuando empiece.</div>
+    <div id="live" hidden>
+      <div class="score">
+        <div class="side ally"><span id="ally-kills">0</span><small>Tu equipo</small></div>
+        <div class="clock" id="live-time">0:00</div>
+        <div class="side enemy"><span id="enemy-kills">0</span><small>Enemigos</small></div>
+      </div>
+      <div id="live-result" class="turn" hidden></div>
+      <div class="objectives">
+        <div id="obj-ally"></div>
+        <div id="obj-enemy"></div>
+      </div>
+
+      <div id="me-box" class="me-box"></div>
+
+      <h3>Tu equipo</h3>
+      <ul id="live-ally" class="live-list"></ul>
+      <h3>Enemigos</h3>
+      <ul id="live-enemy" class="live-list"></ul>
+
+      <h3>Últimos eventos</h3>
+      <ul id="live-feed" class="feed"></ul>
+    </div>
+  </section>
+
+  <!-- Otra fase -->
   <section id="other-view" hidden>
     <p id="other-text"></p>
   </section>

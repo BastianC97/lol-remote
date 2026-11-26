@@ -51,6 +51,10 @@ Las peticiones usan Basic Auth con usuario `riot` y esa contraseña. El certific
 | `POST /api/champ` | `PATCH /lol-champ-select/v1/session/actions/{id}` | Hover, pick o ban (`completed: true` confirma) |
 | `POST /api/spells` | `PATCH /lol-champ-select/v1/session/my-selection` | Hechizos de invocador |
 | `GET/POST /api/runes` | `/lol-perks/v1/pages`, `PUT /lol-perks/v1/currentpage` | Ver y elegir página de runas |
+| `POST /api/bench` | `POST /lol-champ-select/v1/session/bench/swap/{id}` | ARAM: tomar campeón de la banca |
+| `POST /api/reroll` | `POST /lol-champ-select/v1/session/my-selection/reroll` | ARAM: reroll |
+| `POST /api/swap` | `POST /lol-champ-select/v1/session/{trades\|swaps\|position-swaps}/{id}/{request\|accept\|decline\|cancel}` | Intercambiar campeón, orden de pick o rol |
+| `GET /api/live` | `https://127.0.0.1:2999/liveclientdata/allgamedata` | Estadísticas de la partida en curso |
 | `GET /api/img` | `/lol-game-data/assets/...` | Íconos de campeones y hechizos |
 
 Fases de `gameflow-phase`: `None` → `Lobby` → `Matchmaking` → `ReadyCheck` → `ChampSelect` → `InProgress` → ...
@@ -59,6 +63,15 @@ Sobre la selección de campeón (`/lol-champ-select/v1/session`):
 - `localPlayerCellId` indica quién eres tú.
 - `actions` es una lista de turnos (pick o ban). Tu turno es el que tiene `actorCellId === localPlayerCellId` e `isInProgress === true`.
 - `myTeam` y `theirTeam` muestran el campeón de cada jugador (`championId`) y su intención (`championPickIntent`).
+
+### `live.js`: estadísticas en partida
+Durante la partida, el **juego** (no el cliente) levanta una API oficial de solo lectura en `https://127.0.0.1:2999/liveclientdata/`, la misma que usan los overlays. De ahí salen el tiempo, las kills, los objetivos, el nivel, el K/D/A, el CS y los ítems de cada jugador, además de tus stats. Es lo mismo que muestra la tecla Tab. El evento `GameStart` indica que terminó la pantalla de carga, y con eso se manda el aviso "La partida comenzó".
+
+### Modos de juego
+- **Draft / Clasificatoria / A ciegas**: turnos de `actions` (pick/ban).
+- **ARAM y modos aleatorios**: `benchEnabled`, `benchChampions` y `rerollsRemaining`. No hay turnos: cambias con la banca o haces reroll.
+- **Intercambios** (`trades`, `pickOrderSwaps`, `positionSwaps`): aparecen como botones en cada aliado cuando el cliente los permite.
+- Si un modo no se comporta bien, abre `/setup` y pulsa **"Descargar diagnóstico"** durante la selección. El archivo trae lo que entrega el cliente.
 
 ### `public/`: la web del celular
 HTML, CSS y JavaScript sin frameworks. `app.js` consulta `/api/state` cada segundo y muestra la pantalla que corresponde a la fase. Cuando se encuentra una partida, el celular vibra y suena un pitido.

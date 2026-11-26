@@ -8,9 +8,11 @@
 // celular conectado) y avisa cuando:
 //   - se encuentra partida (ReadyCheck)
 //   - es tu turno de elegir o banear
+//   - la partida comenzó (terminó la pantalla de carga)
 
 const https = require('https');
 const lcu = require('./lcu');
+const live = require('./live');
 
 const NTFY_SERVER = process.env.NTFY_SERVER || 'https://ntfy.sh';
 
@@ -43,6 +45,7 @@ function send(topic, { title, message, priority = 4, tags = '', click = '' }) {
 function startWatching({ getTopic, isEnabled, getClickUrl }) {
   let lastPhase = null;
   let lastTurnId = null;
+  let waitingStart = false; // en partida, esperando que termine la pantalla de carga
 
   const notify = (opts) => {
     if (!isEnabled()) return;
@@ -81,6 +84,30 @@ function startWatching({ getTopic, isEnabled, getClickUrl }) {
       } catch { /* ignorar */ }
     } else {
       lastTurnId = null;
+    }
+
+    // La fase InProgress empieza con la pantalla de carga. El juego avisa el
+    // inicio real con el evento "GameStart" en la API de la partida.
+    if (phase === 'InProgress' && lastPhase !== 'InProgress') waitingStart = true;
+    if (phase !== 'InProgress') waitingStart = false;
+    if (waitingStart) {
+      try {
+        const evs = await live.events();
+        const start = evs.find((e) => e.EventName === 'GameStart');
+        if (start) {
+          waitingStart = false;
+          // Si LoL Remote se abrió con la partida ya avanzada, no avisar
+          const lastTime = evs.length ? evs[evs.length - 1].EventTime : 0;
+          if (lastTime < 90) {
+            notify({
+              title: '🎮 ¡La partida comenzó!',
+              message: 'Terminó la pantalla de carga. ¡Ve al PC!',
+              priority: 5,
+              tags: 'video_game',
+            });
+          }
+        }
+      } catch { /* todavía en pantalla de carga */ }
     }
 
     lastPhase = phase;
