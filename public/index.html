@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a1428">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>LoL Remote</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>LoL Remote</h1>
+    <span id="status" class="pill">Conectando…</span>
+  </header>
+
+  <!-- PIN -->
+  <section id="pin-view" hidden>
+    <h2>Conecta tu celular</h2>
+    <p>Escanea con la cámara el QR que aparece en el PC (en la página de LoL Remote).</p>
+    <details>
+      <summary>Ingresar código a mano</summary>
+      <input id="pin-input" type="text" autocomplete="off" autocapitalize="off" placeholder="Código">
+      <button id="pin-save" class="btn primary">Entrar</button>
+    </details>
+  </section>
+
+  <!-- Sin cliente / lobby / buscando -->
+  <section id="idle-view" hidden>
+    <p id="idle-text"></p>
+    <div class="row">
+      <button id="queue-start" class="btn primary" hidden>Buscar partida</button>
+      <button id="queue-stop" class="btn" hidden>Cancelar búsqueda</button>
+    </div>
+  </section>
+
+  <!-- Partida encontrada -->
+  <section id="ready-view" hidden>
+    <h2>¡Partida encontrada!</h2>
+    <p id="ready-text"></p>
+    <div class="row">
+      <button id="accept" class="btn primary big">ACEPTAR</button>
+      <button id="decline" class="btn danger">Rechazar</button>
+    </div>
+  </section>
+
+  <!-- Selección de campeón -->
+  <section id="cs-view" hidden>
+    <div class="cs-top">
+      <span id="cs-phase"></span>
+      <span id="cs-timer" class="timer"></span>
+    </div>
+    <div id="cs-turn" class="turn" hidden></div>
+
+    <div class="teams">
+      <div><h3>Tu equipo</h3><ul id="team-ally"></ul></div>
+      <div><h3>Enemigos</h3><ul id="team-enemy"></ul></div>
+    </div>
+    <div class="bans">
+      <div>Bans aliados: <span id="bans-ally"></span></div>
+      <div>Bans enemigos: <span id="bans-enemy"></span></div>
+    </div>
+
+    <nav class="tabs">
+      <button data-tab="champs" class="active">Campeón</button>
+      <button data-tab="spells">Hechizos</button>
+      <button data-tab="runes">Runas</button>
+    </nav>
+
+    <div id="tab-champs" class="tab">
+      <input id="champ-search" type="search" placeholder="Buscar campeón…">
+      <div id="champ-grid" class="grid"></div>
+      <div class="sticky-bar">
+        <span id="champ-selected">Ninguno seleccionado</span>
+        <button id="champ-lock" class="btn primary" disabled>Confirmar</button>
+      </div>
+    </div>
+
+    <div id="tab-spells" class="tab" hidden>
+      <p>Toca un espacio y luego el hechizo.</p>
+      <div class="row spell-slots">
+        <button class="slot active" data-slot="0"></button>
+        <button class="slot" data-slot="1"></button>
+      </div>
+      <div id="spell-grid" class="grid small"></div>
+    </div>
+
+    <div id="tab-runes" class="tab" hidden>
+      <ul id="rune-list" class="list"></ul>
+    </div>
+  </section>
+
+  <!-- En partida u otra fase -->
+  <section id="other-view" hidden>
+    <p id="other-text"></p>
+  </section>
+
+  <div id="toast" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+LoL Remote - Acepta partidas y elige campeón desde el celular
+=============================================================
+
+CÓMO USARLO
+
+1. Abre el cliente de League of Legends.
+
+2. Haz doble clic en LoLRemote.exe.
+   - Si aparece "Windows protegió su PC":
+     haz clic en "Más información" y luego en "Ejecutar de todas formas".
+   - Si Windows pregunta por el firewall: marca "Redes privadas" y dale "Permitir".
+
+3. Se abre una página en tu navegador con un código QR.
+   Escanéalo con la cámara del celular y abre el link.
+
+4. (Recomendado) Activa las notificaciones:
+   - Instala la app gratis "ntfy" (escanea el QR de iPhone o Android
+     que aparece en la página).
+   - En ntfy toca "+", escribe el tema que aparece en la página
+     (empieza con "lolr-") y toca "Subscribe". Permite las notificaciones.
+   - Pulsa "Enviar notificación de prueba" para comprobar que llega.
+   Así te avisa cuando encuentra partida y cuando es tu turno,
+   aunque tengas el celular bloqueado.
+
+5. ¡Listo! En el celular puedes:
+   - Buscar partida y aceptarla
+   - Elegir y banear campeones
+   - Cambiar hechizos de invocador y página de runas
+   - Ver lo que eligió cada jugador
+
+CONSEJOS
+
+- El celular debe estar en el mismo WiFi que el PC.
+  ¿Quieres usarlo con datos móviles? En la página del QR pulsa
+  "Activar acceso desde cualquier lugar" y escanea el nuevo QR.
+  (Ese link cambia cada vez que lo activas.)
+- En el celular usa "Agregar a pantalla de inicio" para tenerlo como app.
+- No cierres la ventana negra mientras lo uses.
+- Si la cerraste, vuelve a abrir LoLRemote.exe. El celular sigue
+  funcionando sin escanear de nuevo (en el mismo WiFi).
+- No compartas tu QR: quien lo tenga puede controlar tu selección.
+
+AVISOS
+
+- Si aceptas una partida y no llegas al PC a tiempo, el juego
+  te penaliza como siempre (AFK / dodge).
+- Herramienta no oficial. No está afiliada ni respaldada por Riot Games.

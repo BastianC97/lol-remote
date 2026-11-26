@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LoL Remote · Conectar celular</title>
+  <style>
+    :root { --bg:#0a1428; --panel:#111d33; --line:#1e2d4a; --gold:#c8aa6e; --text:#e8e6e3; --muted:#8b96a8; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--text); }
+    main { max-width: 900px; margin: 0 auto; padding: 32px 20px; }
+    h1 { color: var(--gold); margin: 0 0 4px; }
+    .sub { color: var(--muted); margin: 0 0 24px; }
+    .status { display:inline-block; padding:6px 12px; border-radius:999px; font-size:14px; margin-bottom:24px; }
+    .ok { background:#143d2a; color:#6fe3a1; }
+    .bad { background:#3a1620; color:#ffb3b3; }
+    .cards { display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:20px; }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px; }
+    .card h2 { margin:0 0 6px; font-size:20px; }
+    .card p { color:var(--muted); margin:0 0 14px; font-size:14px; line-height:1.45; }
+    .qr { background:#fff; border-radius:12px; padding:10px; width:220px; height:220px; display:block; margin: 8px auto 14px; }
+    .link { font-size:12px; color:var(--muted); word-break:break-all; text-align:center; }
+    button { border:1px solid var(--gold); background:var(--gold); color:#1a1408; padding:12px 18px; border-radius:10px; font-size:16px; font-weight:700; cursor:pointer; width:100%; }
+    button.ghost { background:transparent; color:var(--text); border-color:var(--line); font-weight:500; }
+    ol { color:var(--muted); font-size:14px; line-height:1.7; padding-left:20px; }
+    .note { margin-top:28px; color:var(--muted); font-size:13px; line-height:1.5; }
+    .err { color:#ffb3b3; font-size:14px; }
+    .stores { display:flex; gap:24px; margin:10px 0 6px; }
+    .stores figure { margin:0; text-align:center; font-size:13px; color:var(--text); }
+    .stores img { background:#fff; border-radius:8px; padding:6px; width:120px; height:120px; display:block; margin-bottom:4px; }
+    .topic { display:flex; gap:10px; align-items:center; margin:8px 0 4px; }
+    .topic code { font-size:22px; color:var(--gold); background:#0c172b; padding:8px 12px; border-radius:8px; letter-spacing:.5px; user-select:all; }
+    button.small { width:auto; padding:8px 12px; font-size:14px; }
+    .row2 { display:flex; gap:10px; flex-wrap:wrap; }
+    .row2 button { width:auto; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>LoL Remote</h1>
+  <p class="sub">Controla la selección de campeones desde tu celular.</p>
+  <span id="lol" class="status bad">Buscando el cliente de LoL…</span>
+
+  <div class="cards">
+    <section class="card">
+      <h2>🏠 En la misma red WiFi</h2>
+      <p>Conecta el celular al mismo WiFi que este PC y escanea el código con la cámara.</p>
+      <div id="lan"></div>
+    </section>
+
+    <section class="card">
+      <h2>🌎 Desde cualquier lugar</h2>
+      <p>Para usarlo con datos móviles o desde otra casa. Crea un link seguro y temporal con Cloudflare (gratis).</p>
+      <div id="tunnel"></div>
+    </section>
+  </div>
+
+  <section class="card" style="margin-top:20px">
+    <h2>🔔 Notificaciones al celular</h2>
+    <p>Te aviso cuando se encuentre partida y cuando sea tu turno de elegir o banear,
+       aunque tengas el celular bloqueado. Usa la app gratis <b>ntfy</b> (no pide cuenta).</p>
+    <ol>
+      <li>Instala <b>ntfy</b> escaneando el QR de tu celular:
+        <div class="stores" id="stores"></div>
+      </li>
+      <li>Abre ntfy, toca <b>+</b> (o “Subscribe to topic”), escribe este tema y toca <b>Subscribe</b>.
+          Si te pide permiso para notificaciones, dale <b>Permitir</b>.
+        <div class="topic"><code id="topic">…</code><button class="ghost small" id="copy">Copiar</button></div>
+      </li>
+      <li>Prueba que llegue:</li>
+    </ol>
+    <div class="row2">
+      <button id="ntest">Enviar notificación de prueba</button>
+      <button class="ghost" id="ntoggle">…</button>
+    </div>
+    <p id="nmsg" style="margin-top:10px"></p>
+  </section>
+
+  <section class="card" style="margin-top:20px">
+    <h2>Cómo usarlo</h2>
+    <ol>
+      <li>Escanea un QR con la cámara del celular y abre el link.</li>
+      <li>En el celular, usa “Agregar a pantalla de inicio” para tenerlo como app.</li>
+      <li>Busca partida en el PC (o desde el celular) y aléjate: cuando la encuentre, te llega una notificación.</li>
+      <li>Acepta, elige campeón, hechizos y runas desde el celular.</li>
+    </ol>
+  </section>
+
+  <p class="note">
+    ⚠️ No cierres la ventana negra de LoL Remote mientras lo uses.<br>
+    🔒 No compartas estos QR: quien los tenga puede controlar tu selección de campeones.
+    Si los compartiste por error, pulsa el botón de abajo.
+  </p>
+  <button class="ghost" id="reset" style="width:auto">Generar códigos nuevos</button>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const post = (url) => fetch(url, { method: 'POST', headers: { 'x-setup': '1' } });
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+  let lastKey = '';
+  async function refresh() {
+    let info;
+    try { info = await (await fetch('/setup/info')).json(); }
+    catch { $('lol').textContent = 'LoL Remote se cerró. Vuelve a abrirlo.'; $('lol').className = 'status bad'; return; }
+
+    renderNtfy(info.ntfy);
+    $('lol').textContent = info.lolConnected ? '✅ Cliente de LoL conectado' : '⏳ Abre el cliente de LoL (lo detecto solo)';
+    $('lol').className = 'status ' + (info.lolConnected ? 'ok' : 'bad');
+
+    // Solo redibujar si algo cambió (para que el QR no parpadee)
+    const key = JSON.stringify([info.lan.map((l) => l.url), info.tunnel.status, info.tunnel.url, info.tunnel.progress]);
+    if (key === lastKey) return;
+    lastKey = key;
+
+    $('lan').innerHTML = info.lan.length
+      ? info.lan.slice(0, 2).map((l) => `<img class="qr" src="${l.qr}" alt="QR"><div class="link">${esc(l.url.split('/#')[0])}</div>`).join('<hr style="border-color:#1e2d4a">')
+      : '<p class="err">No encontré una red WiFi/Ethernet. ¿El PC está conectado a internet?</p>';
+
+    const t = info.tunnel;
+    let html = '';
+    if (t.status === 'on') {
+      html = `<img class="qr" src="${t.qr}" alt="QR"><div class="link">${esc(t.url)}</div>
+              <p style="margin-top:12px">Este link cambia cada vez que lo activas: vuelve a escanear el QR.</p>
+              <button class="ghost" id="tstop">Desactivar</button>`;
+    } else if (t.status === 'downloading') {
+      html = `<p>Descargando Cloudflare… ${t.progress}% (solo la primera vez)</p>`;
+    } else if (t.status === 'starting') {
+      html = '<p>Creando el link seguro… (unos segundos)</p>';
+    } else {
+      html = (t.error ? `<p class="err">${esc(t.error)}</p>` : '') + '<button id="tstart">Activar acceso desde cualquier lugar</button>';
+    }
+    $('tunnel').innerHTML = html;
+    if ($('tstart')) $('tstart').onclick = () => post('/setup/tunnel/start').then(refresh);
+    if ($('tstop')) $('tstop').onclick = () => post('/setup/tunnel/stop').then(refresh);
+  }
+
+  let ntfyDrawn = '';
+  function renderNtfy(n) {
+    $('topic').textContent = n.topic;
+    $('ntoggle').textContent = n.enabled ? 'Desactivar notificaciones' : 'Activar notificaciones';
+    $('ntest').disabled = !n.enabled;
+    if (ntfyDrawn !== 'x') {
+      ntfyDrawn = 'x';
+      $('stores').innerHTML = `<figure><img src="${n.stores.ios}" alt="QR App Store">iPhone</figure>
+                               <figure><img src="${n.stores.android}" alt="QR Google Play">Android</figure>`;
+    }
+  }
+  $('copy').onclick = () => navigator.clipboard?.writeText($('topic').textContent).then(() => {
+    $('copy').textContent = '¡Copiado!';
+    setTimeout(() => ($('copy').textContent = 'Copiar'), 1500);
+  });
+  $('ntest').onclick = async () => {
+    $('nmsg').className = ''; $('nmsg').textContent = 'Enviando…';
+    const r = await post('/setup/ntfy/test');
+    if (r.ok) { $('nmsg').textContent = '✅ Enviada. Si no te llegó, revisa que escribiste bien el tema en ntfy.'; }
+    else { const e = await r.json().catch(() => ({})); $('nmsg').className = 'err'; $('nmsg').textContent = 'No se pudo enviar: ' + (e.error || 'error'); }
+  };
+  $('ntoggle').onclick = () => post('/setup/ntfy/toggle').then(refresh);
+
+  $('reset').onclick = async () => {
+    if (!confirm('Los celulares tendrán que escanear el QR otra vez y suscribirse al nuevo tema de ntfy. ¿Continuar?')) return;
+    await post('/setup/reset');
+    lastKey = '';
+    refresh();
+  };
+
+  refresh();
+  setInterval(refresh, 2000);
+</script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "name": "lol-remote",
+  "version": "1.0.0",
+  "description": "Controla la selección de campeones de League of Legends desde tu celular",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "pkg . --targets node22-win-x64 --output dist/LoLRemote.exe --compress GZip"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.21.2",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^6.26.0"
+  },
+  "bin": "server.js",
+  "pkg": {
+    "assets": [
+      "public/**/*",
+      "views/**/*"
+    ]
+  }
+}
