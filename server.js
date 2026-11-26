@@ -11,6 +11,7 @@ const config = require('./config');
 const setup = require('./setup');
 const notifier = require('./notifier');
 const live = require('./live');
+const chat = require('./chat');
 
 const PORT = Number(process.env.PORT) || 3000;
 const cfg = config.load();
@@ -283,6 +284,11 @@ app.post('/api/swap', handle((req) => {
   if (!Number.isInteger(id)) throw new Error('id inválido');
   return act('POST', `/lol-champ-select/v1/session/${kind}/${id}/${action}`);
 }));
+
+// Chat del lobby / selección / post-partida
+const currentPhase = () => lcu.get('/lol-gameflow/v1/gameflow-phase').catch(() => null);
+app.get('/api/chat', handle(async () => chat.read(await currentPhase())));
+app.post('/api/chat', handle(async (req) => chat.send(await currentPhase(), req.body?.body)));
 
 // Estadísticas de la partida en curso (API oficial del juego, puerto 2999)
 app.get('/api/live', handle(() => live.summary()));

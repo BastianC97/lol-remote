@@ -3,146 +3,178 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0a1428">
+  <meta name="theme-color" content="#050B16">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>LoL Remote</title>
+  <link rel="preload" href="fonts/cinzel-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>
-    <h1>LoL Remote</h1>
-    <span id="status" class="pill">Conectando…</span>
+  <header class="top">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 32 36" aria-hidden="true">
+        <path d="M16 1 31 9.5v17L16 35 1 26.5v-17Z" fill="none" stroke="url(#g)" stroke-width="1.6"/>
+        <path d="M16 8 25 13v10l-9 5-9-5V13Z" fill="url(#g)" opacity=".9"/>
+        <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#F0E6D2"/><stop offset=".5" stop-color="#C8AA6E"/><stop offset="1" stop-color="#785A28"/>
+        </linearGradient></defs>
+      </svg>
+      <span class="wordmark">LoL Remote</span>
+    </div>
+    <span id="status" class="status"><i></i><b>Conectando</b></span>
   </header>
 
-  <!-- PIN -->
-  <section id="pin-view" hidden>
-    <h2>Conecta tu celular</h2>
-    <p>Escanea con la cámara el QR que aparece en el PC (en la página de LoL Remote).</p>
-    <details>
-      <summary>Ingresar código a mano</summary>
-      <input id="pin-input" type="text" autocomplete="off" autocapitalize="off" placeholder="Código">
-      <button id="pin-save" class="btn primary">Entrar</button>
-    </details>
-  </section>
+  <main>
+    <!-- Código -->
+    <section id="pin-view" class="panel" hidden>
+      <h2 class="title">Conecta tu celular</h2>
+      <p class="lead">Escanea con la cámara el QR que aparece en la página de LoL Remote en tu PC.</p>
+      <details class="manual">
+        <summary>Ingresar el código a mano</summary>
+        <input id="pin-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Código">
+        <button id="pin-save" class="btn primary">Conectar</button>
+      </details>
+    </section>
 
-  <!-- Sin cliente / lobby / buscando -->
-  <section id="idle-view" hidden>
-    <p id="idle-text"></p>
-    <div class="row">
-      <button id="queue-start" class="btn primary" hidden>Buscar partida</button>
-      <button id="queue-stop" class="btn" hidden>Cancelar búsqueda</button>
-    </div>
-  </section>
+    <!-- Menú / lobby / buscando -->
+    <section id="idle-view" class="panel center" hidden>
+      <p id="idle-text" class="lead"></p>
+      <div class="actions">
+        <button id="queue-start" class="btn primary wide" hidden>Buscar partida</button>
+        <button id="queue-stop" class="btn ghost wide" hidden>Cancelar búsqueda</button>
+      </div>
+    </section>
 
-  <!-- Partida encontrada -->
-  <section id="ready-view" hidden>
-    <h2>¡Partida encontrada!</h2>
-    <p id="ready-text"></p>
-    <div class="row">
-      <button id="accept" class="btn primary big">ACEPTAR</button>
-      <button id="decline" class="btn danger">Rechazar</button>
-    </div>
-  </section>
+    <!-- Partida encontrada -->
+    <section id="ready-view" class="ready" hidden>
+      <h2 class="title">Partida encontrada</h2>
+      <p id="ready-queue" class="sub"></p>
+      <button id="accept" class="accept">
+        <svg viewBox="0 0 200 200" aria-hidden="true">
+          <circle class="track" cx="100" cy="100" r="92"/>
+          <circle id="ready-ring" class="ring" cx="100" cy="100" r="92"/>
+        </svg>
+        <span>Aceptar</span>
+      </button>
+      <p id="ready-text" class="sub"></p>
+      <button id="decline" class="btn text">Rechazar</button>
+    </section>
 
-  <!-- Selección de campeón -->
-  <section id="cs-view" hidden>
-    <div class="cs-top">
-      <span id="cs-phase"></span>
-      <span id="cs-timer" class="timer"></span>
-    </div>
-    <div id="cs-turn" class="turn" hidden></div>
+    <!-- Selección de campeón -->
+    <section id="cs-view" hidden>
+      <div class="cs-head">
+        <span id="cs-phase" class="phase"></span>
+        <span id="cs-timer" class="timer"></span>
+      </div>
+      <div id="cs-turn" class="turn" hidden></div>
+      <div id="swap-incoming"></div>
 
-    <!-- Me pidieron un intercambio -->
-    <div id="swap-incoming"></div>
+      <div class="teams" id="teams">
+        <div class="team ally"><h3>Tu equipo</h3><ul id="team-ally"></ul></div>
+        <div class="team enemy" id="enemy-col"><h3>Enemigos</h3><ul id="team-enemy"></ul></div>
+      </div>
+      <div class="bans" id="bans">
+        <div><span>Bans aliados</span><span id="bans-ally"></span></div>
+        <div><span>Bans enemigos</span><span id="bans-enemy"></span></div>
+      </div>
 
-    <div class="teams" id="teams">
-      <div><h3>Tu equipo</h3><ul id="team-ally"></ul></div>
-      <div id="enemy-col"><h3>Enemigos</h3><ul id="team-enemy"></ul></div>
-    </div>
-    <div class="bans" id="bans">
-      <div>Bans aliados: <span id="bans-ally"></span></div>
-      <div>Bans enemigos: <span id="bans-enemy"></span></div>
-    </div>
+      <nav class="tabs">
+        <button data-tab="champs" class="active">Campeón</button>
+        <button data-tab="spells">Hechizos</button>
+        <button data-tab="runes">Runas</button>
+      </nav>
 
-    <nav class="tabs">
-      <button data-tab="champs" class="active">Campeón</button>
-      <button data-tab="spells">Hechizos</button>
-      <button data-tab="runes">Runas</button>
-    </nav>
-
-    <div id="tab-champs" class="tab">
-      <!-- ARAM y modos aleatorios -->
-      <div id="aram" hidden>
-        <div class="my-champ">
-          <img id="my-champ-img" alt="">
-          <div>
-            <small>Tu campeón</small>
-            <strong id="my-champ-name">—</strong>
+      <div id="tab-champs" class="tab">
+        <div id="aram" hidden>
+          <div class="my-champ">
+            <img id="my-champ-img" alt="">
+            <div><small>Tu campeón</small><strong id="my-champ-name">—</strong></div>
+            <button id="reroll" class="btn ghost">🎲 Reroll <span id="reroll-count"></span></button>
           </div>
-          <button id="reroll" class="btn">🎲 Reroll <span id="reroll-count"></span></button>
+          <h3>Banca</h3>
+          <p class="hint">Toca un campeón para cambiarlo por el tuyo.</p>
+          <div id="bench-grid" class="grid small bench"></div>
         </div>
-        <h3>Banca · toca para cambiar</h3>
-        <div id="bench-grid" class="grid small bench"></div>
+
+        <div id="picker">
+          <input id="champ-search" type="search" placeholder="Buscar campeón">
+          <div id="champ-grid" class="grid"></div>
+        </div>
+        <p id="no-actions" class="hint" hidden>En este modo no hay turnos para elegir. Puedes cambiar hechizos y runas en las otras pestañas.</p>
       </div>
 
-      <div id="picker">
-      <input id="champ-search" type="search" placeholder="Buscar campeón…">
-      <div id="champ-grid" class="grid"></div>
+      <div id="tab-spells" class="tab" hidden>
+        <p class="hint">Toca un espacio y luego el hechizo.</p>
+        <div class="spell-slots">
+          <button class="slot active" data-slot="0" aria-label="Hechizo 1"></button>
+          <button class="slot" data-slot="1" aria-label="Hechizo 2"></button>
+        </div>
+        <div id="spell-grid" class="grid small"></div>
       </div>
-      <p id="no-actions" class="muted" hidden>En este modo no eliges campeón con turnos. Puedes cambiar hechizos y runas en las otras pestañas.</p>
-      <div class="sticky-bar" id="champ-bar">
-        <span id="champ-selected">Ninguno seleccionado</span>
-        <button id="champ-lock" class="btn primary" disabled>Confirmar</button>
+
+      <div id="tab-runes" class="tab" hidden>
+        <ul id="rune-list" class="runes"></ul>
       </div>
+    </section>
+
+    <!-- En partida -->
+    <section id="live-view" hidden>
+      <div id="live-loading" class="panel center">
+        <p class="lead">Pantalla de carga</p>
+        <p class="hint">Te aviso cuando empiece la partida.</p>
+      </div>
+      <div id="live" hidden>
+        <div class="score">
+          <div class="side ally"><span id="ally-kills">0</span><small>Tu equipo</small></div>
+          <div id="live-time" class="clock">0:00</div>
+          <div class="side enemy"><span id="enemy-kills">0</span><small>Enemigos</small></div>
+        </div>
+        <div class="killbar"><i id="kill-bar"></i></div>
+        <div id="live-result" class="turn" hidden></div>
+        <div class="objectives">
+          <div id="obj-ally"></div>
+          <div id="obj-enemy"></div>
+        </div>
+        <div id="me-box" class="me-box"></div>
+        <h3>Tu equipo</h3>
+        <ul id="live-ally" class="live-list"></ul>
+        <h3>Enemigos</h3>
+        <ul id="live-enemy" class="live-list enemy"></ul>
+        <h3>Últimos eventos</h3>
+        <ul id="live-feed" class="feed"></ul>
+      </div>
+    </section>
+
+    <section id="other-view" class="panel center" hidden>
+      <p id="other-text" class="lead"></p>
+    </section>
+  </main>
+
+  <!-- Barra para confirmar campeón -->
+  <div class="dock" id="champ-bar" hidden>
+    <span id="champ-selected">Elige un campeón</span>
+    <button id="champ-lock" class="btn primary" disabled>Confirmar</button>
+  </div>
+
+  <!-- Chat -->
+  <button id="chat-fab" class="chat-fab" hidden aria-label="Abrir chat">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+    <b id="chat-badge" hidden>0</b>
+  </button>
+  <div id="chat-sheet" class="sheet" hidden>
+    <div class="sheet-head">
+      <strong id="chat-title">Chat</strong>
+      <button id="chat-close" class="btn text" aria-label="Cerrar chat">Cerrar</button>
     </div>
+    <ul id="chat-list" class="chat"></ul>
+    <form id="chat-form" class="chat-form">
+      <input id="chat-input" type="text" maxlength="500" autocomplete="off" placeholder="Escribe un mensaje">
+      <button class="btn primary" type="submit">Enviar</button>
+    </form>
+  </div>
 
-    <div id="tab-spells" class="tab" hidden>
-      <p>Toca un espacio y luego el hechizo.</p>
-      <div class="row spell-slots">
-        <button class="slot active" data-slot="0"></button>
-        <button class="slot" data-slot="1"></button>
-      </div>
-      <div id="spell-grid" class="grid small"></div>
-    </div>
-
-    <div id="tab-runes" class="tab" hidden>
-      <ul id="rune-list" class="list"></ul>
-    </div>
-  </section>
-
-  <!-- En partida: estadísticas en vivo -->
-  <section id="live-view" hidden>
-    <div id="live-loading" class="muted">⏳ Pantalla de carga… te aviso cuando empiece.</div>
-    <div id="live" hidden>
-      <div class="score">
-        <div class="side ally"><span id="ally-kills">0</span><small>Tu equipo</small></div>
-        <div class="clock" id="live-time">0:00</div>
-        <div class="side enemy"><span id="enemy-kills">0</span><small>Enemigos</small></div>
-      </div>
-      <div id="live-result" class="turn" hidden></div>
-      <div class="objectives">
-        <div id="obj-ally"></div>
-        <div id="obj-enemy"></div>
-      </div>
-
-      <div id="me-box" class="me-box"></div>
-
-      <h3>Tu equipo</h3>
-      <ul id="live-ally" class="live-list"></ul>
-      <h3>Enemigos</h3>
-      <ul id="live-enemy" class="live-list"></ul>
-
-      <h3>Últimos eventos</h3>
-      <ul id="live-feed" class="feed"></ul>
-    </div>
-  </section>
-
-  <!-- Otra fase -->
-  <section id="other-view" hidden>
-    <p id="other-text"></p>
-  </section>
-
-  <div id="toast" hidden></div>
+  <div id="toast" role="status" hidden></div>
   <script src="app.js"></script>
 </body>
 </html>

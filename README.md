@@ -1,6 +1,6 @@
 # LoL Remote
 
-Desde el celular puedes aceptar partidas, pickear y banear campeones, cambiar hechizos y runas, y ver qué eligió cada jugador en League of Legends. También te llega una notificación cuando se encuentra partida o cuando es tu turno.
+Desde el celular puedes aceptar partidas, pickear y banear campeones, cambiar hechizos y runas, chatear con tu equipo, ver qué eligió cada jugador y seguir las estadísticas de la partida en League of Legends. También te llega una notificación cuando se encuentra partida o cuando es tu turno.
 
 **[⬇️ Descargar LoLRemote.exe](https://github.com/BastianC97/lol-remote/releases/latest)** (Windows, no necesita instalar nada)
 
@@ -54,6 +54,7 @@ Las peticiones usan Basic Auth con usuario `riot` y esa contraseña. El certific
 | `POST /api/bench` | `POST /lol-champ-select/v1/session/bench/swap/{id}` | ARAM: tomar campeón de la banca |
 | `POST /api/reroll` | `POST /lol-champ-select/v1/session/my-selection/reroll` | ARAM: reroll |
 | `POST /api/swap` | `POST /lol-champ-select/v1/session/{trades\|swaps\|position-swaps}/{id}/{request\|accept\|decline\|cancel}` | Intercambiar campeón, orden de pick o rol |
+| `GET/POST /api/chat` | `/lol-chat/v1/conversations/{id}/messages` | Leer y escribir en el chat del lobby, de la selección o de fin de partida |
 | `GET /api/live` | `https://127.0.0.1:2999/liveclientdata/allgamedata` | Estadísticas de la partida en curso |
 | `GET /api/img` | `/lol-game-data/assets/...` | Íconos de campeones y hechizos |
 
@@ -66,6 +67,12 @@ Sobre la selección de campeón (`/lol-champ-select/v1/session`):
 
 ### `live.js`: estadísticas en partida
 Durante la partida, el **juego** (no el cliente) levanta una API oficial de solo lectura en `https://127.0.0.1:2999/liveclientdata/`, la misma que usan los overlays. De ahí salen el tiempo, las kills, los objetivos, el nivel, el K/D/A, el CS y los ítems de cada jugador, además de tus stats. Es lo mismo que muestra la tecla Tab. El evento `GameStart` indica que terminó la pantalla de carga, y con eso se manda el aviso "La partida comenzó".
+
+### `chat.js`: chat
+Los chats de grupo aparecen en `/lol-chat/v1/conversations` con tipos como `championSelect`, `postGame` o `customGame`. Los mensajes privados (`chat`) no se muestran. La conversación se elige según la fase del juego, y los nombres se sacan del lobby, de la selección y de la lista de amigos.
+
+### Diseño
+Usa los colores del cliente (azul noche `#050B16`/`#0A1428`, dorado `#C8AA6E`, crema `#F0E6D2`) y la tipografía [Cinzel](https://fonts.google.com/specimen/Cinzel) (licencia OFL, incluida en `public/fonts`).
 
 ### Modos de juego
 - **Draft / Clasificatoria / A ciegas**: turnos de `actions` (pick/ban).

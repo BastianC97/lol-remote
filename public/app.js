@@ -46,7 +46,23 @@ async function run(fn) {
 
 // ---------- Vistas ----------
 const views = ['pin-view', 'idle-view', 'ready-view', 'cs-view', 'live-view', 'other-view'];
-function showView(id) { views.forEach((v) => ($(v).hidden = v !== id)); }
+function showView(id) {
+  views.forEach((v) => ($(v).hidden = v !== id));
+  if (id !== 'cs-view') $('champ-bar').hidden = true;
+  syncDock();
+}
+// La barra de confirmar y el botón de chat no deben taparse
+function syncDock() { document.body.classList.toggle('has-dock', !$('champ-bar').hidden); }
+
+const PHASE_NAME = {
+  None: 'En el menú', Lobby: 'En lobby', Matchmaking: 'Buscando', ReadyCheck: 'Partida encontrada',
+  ChampSelect: 'Selección', GameStart: 'Cargando', InProgress: 'En partida', Reconnect: 'Reconectar',
+  WaitingForStats: 'Fin de partida', PreEndOfGame: 'Fin de partida', EndOfGame: 'Fin de partida',
+};
+function setStatus(text, ok) {
+  $('status').querySelector('b').textContent = text;
+  $('status').classList.toggle('ok', !!ok);
+}
 
 $('pin-save').onclick = () => {
   pin = $('pin-input').value.trim();
@@ -103,16 +119,14 @@ async function tick() {
     state = await api('/state');
   } catch (e) {
     if (e.message !== 'PIN') {
-      $('status').textContent = 'PC sin conexión';
-      $('status').className = 'pill';
+      setStatus('PC sin conexión', false);
     }
     return;
   }
   lastState = state;
 
   if (!state.connected) {
-    $('status').textContent = 'LoL cerrado';
-    $('status').className = 'pill';
+    setStatus('LoL cerrado', false);
     $('idle-text').textContent = 'No encuentro el cliente de LoL en el PC. Ábrelo y espera unos segundos.';
     $('queue-start').hidden = $('queue-stop').hidden = true;
     showView('idle-view');
@@ -120,20 +134,20 @@ async function tick() {
     return;
   }
 
-  $('status').textContent = state.phase;
-  $('status').className = 'pill ok';
+  setStatus(PHASE_NAME[state.phase] || state.phase, true);
+  updateChat(state.phase);
 
   const entered = state.phase !== prevPhase;
   prevPhase = state.phase;
 
   switch (state.phase) {
     case 'None':
-      $('idle-text').textContent = 'Estás en el menú principal. Crea un lobby en el PC para poder buscar partida.';
+      $('idle-text').textContent = 'Crea un lobby en el PC y desde aquí podrás buscar partida.';
       $('queue-start').hidden = $('queue-stop').hidden = true;
       showView('idle-view');
       break;
     case 'Lobby':
-      $('idle-text').textContent = `En lobby${state.queueName ? ' · ' + state.queueName : ''}.`;
+      $('idle-text').textContent = state.queueName ? `Lobby de ${state.queueName}` : 'En lobby';
       $('queue-start').hidden = false;
       $('queue-stop').hidden = true;
       showView('idle-view');
@@ -141,7 +155,8 @@ async function tick() {
     case 'Matchmaking': {
       const t = Math.floor(state.search?.timeInQueue || 0);
       const est = Math.floor(state.search?.estimatedQueueTime || 0);
-      $('idle-text').textContent = `Buscando partida… ${fmt(t)} (estimado ${fmt(est)})`;
+      $('idle-text').textContent = `Buscando partida ${fmt(t)}`;
+      $('idle-text').title = `Tiempo estimado: ${fmt(est)}`;
       $('queue-start').hidden = true;
       $('queue-stop').hidden = false;
       showView('idle-view');
@@ -150,11 +165,13 @@ async function tick() {
     case 'ReadyCheck':
       if (entered) alertReady();
       renderReady(state.readyCheck);
+      $('ready-queue').textContent = state.queueName || '';
       showView('ready-view');
       break;
     case 'ChampSelect':
       if (entered) {
         selectedId = 0;
+        $('champ-selected').textContent = 'Elige un campeón';
         run(loadChampions);
         run(loadSpells);
         run(loadRunes);
@@ -178,10 +195,14 @@ const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 // ---------- Ready check ----------
 function renderReady(rc) {
   const answered = rc?.playerResponse && rc.playerResponse !== 'None';
+  const left = Math.max(0, 12 - (rc?.timer || 0));
   $('ready-text').textContent = answered
-    ? `Respondiste: ${rc.playerResponse === 'Accepted' ? 'Aceptada ✅' : 'Rechazada'}. Esperando al resto…`
-    : `Tienes ${Math.max(0, 12 - Math.floor(rc?.timer || 0))} s aprox.`;
+    ? (rc.playerResponse === 'Accepted' ? 'Aceptaste. Esperando al resto de jugadores.' : 'Rechazaste la partida.')
+    : `${Math.ceil(left)} segundos para responder`;
+  // El anillo dorado se vacía con el tiempo (circunferencia ≈ 578)
+  $('ready-ring').style.strokeDashoffset = String(578 * (1 - left / 12));
   $('accept').disabled = $('decline').disabled = !!answered;
+  $('accept').querySelector('span').textContent = answered && rc.playerResponse === 'Accepted' ? 'Aceptada' : 'Aceptar';
 }
 
 function alertReady() {
@@ -216,7 +237,7 @@ function renderChampSelect(state) {
   const turn = $('cs-turn');
   if (cs.myTurn) {
     turn.hidden = false;
-    turn.textContent = cs.myTurn.type === 'ban' ? '🚫 ¡Tu turno de BANEAR!' : '⭐ ¡Tu turno de ELEGIR!';
+    turn.textContent = cs.myTurn.type === 'ban' ? 'Tu turno de banear' : 'Tu turno de elegir';
     $('champ-lock').textContent = cs.myTurn.type === 'ban' ? 'Banear' : 'Confirmar';
   } else {
     turn.hidden = true;
@@ -264,7 +285,7 @@ function renderTeam(ul, team, isAlly, swaps) {
     const sp = isAlly
       ? [p.spell1Id, p.spell2Id].map((s) => (spellIcon(s) ? `<img class="spell" src="${img(spellIcon(s))}">` : '')).join('')
       : '';
-    const label = [POS[p.position] || '', champName(id)].filter(Boolean).join(' · ');
+    const role = POS[p.position] || '';
     // Botones de intercambio con este aliado (lo que el cliente ofrezca)
     const btns = (swaps || []).filter((w) => w.cellId === p.cellId && w.state !== 'RECEIVED').map((w) => {
       const sent = w.state === 'SENT';
@@ -273,7 +294,7 @@ function renderTeam(ul, team, isAlly, swaps) {
     }).join(' ');
     return `<li class="${p.isMe ? 'me' : ''}">${pic}<div class="info">
       <span>${p.isMe ? 'Tú' : escapeHtml(p.name) || (isAlly ? 'Aliado' : 'Enemigo')}</span>
-      <small>${escapeHtml(label) || '…'}</small><div>${sp}</div>${btns ? `<div>${btns}</div>` : ''}</div></li>`;
+      <small>${escapeHtml(champName(id)) || (role ? '' : 'Eligiendo…')}${role ? `${champName(id) ? '<br>' : ''}${role}` : ''}</small><div>${sp}</div>${btns ? `<div>${btns}</div>` : ''}</div></li>`;
   }).join('');
 }
 
@@ -385,7 +406,7 @@ function renderSwaps(cs) {
     return `<div class="incoming">🔄 <b>${who}</b> ${what}
       <div class="row">
         <button class="btn primary" data-kind="${w.kind}" data-id="${w.id}" data-action="accept">Aceptar</button>
-        <button class="btn" data-kind="${w.kind}" data-id="${w.id}" data-action="decline">Rechazar</button>
+        <button class="btn ghost" data-kind="${w.kind}" data-id="${w.id}" data-action="decline">Rechazar</button>
       </div></div>`;
   }).join('');
   if (incoming.length) try { navigator.vibrate?.(200); } catch { /* sin vibración */ }
@@ -413,24 +434,27 @@ async function loadLive() {
   $('live-time').textContent = fmt(d.time);
   $('ally-kills').textContent = d.ally.kills;
   $('enemy-kills').textContent = d.enemy.kills;
+  const total = d.ally.kills + d.enemy.kills;
+  $('kill-bar').style.width = `${total ? (d.ally.kills / total) * 100 : 50}%`;
   $('live-result').hidden = !d.result;
   if (d.result) $('live-result').textContent = d.result === 'Win' ? '🏆 ¡Victoria!' : 'Derrota';
 
   const objs = (t) => {
     const parts = [];
-    parts.push(`🗼 ${t.towers} torres`);
-    if (t.dragons.length) parts.push(`🐉 ${t.dragons.length} dragones`);
-    if (t.grubs) parts.push(`🪲 ${t.grubs} larvas`);
-    if (t.heralds) parts.push(`👁️ ${t.heralds} heraldo`);
-    if (t.barons) parts.push(`🟣 ${t.barons} barón`);
-    if (t.inhibs) parts.push(`🏛️ ${t.inhibs} inhib.`);
+    const n = (k, one, many) => `${k} ${k === 1 ? one : many}`;
+    parts.push(`🗼 ${n(t.towers, 'torre', 'torres')}`);
+    if (t.dragons.length) parts.push(`🐉 ${n(t.dragons.length, 'dragón', 'dragones')}`);
+    if (t.grubs) parts.push(`🪲 ${n(t.grubs, 'larva', 'larvas')}`);
+    if (t.heralds) parts.push(`👁️ ${n(t.heralds, 'heraldo', 'heraldos')}`);
+    if (t.barons) parts.push(`🟣 ${n(t.barons, 'barón', 'barones')}`);
+    if (t.inhibs) parts.push(`🏛️ ${n(t.inhibs, 'inhibidor', 'inhibidores')}`);
     return parts.join('<br>');
   };
   $('obj-ally').innerHTML = objs(d.ally);
   $('obj-enemy').innerHTML = objs(d.enemy);
 
   const st = d.me.stats;
-  $('me-box').innerHTML = `<div><span class="gold">💰 ${d.me.gold}</span> &nbsp; Nivel ${d.me.level ?? '-'} · ❤️ ${st.hp}</div>
+  $('me-box').innerHTML = `<div><span class="gold">💰 ${d.me.gold}</span><span class="lvl">Nivel ${d.me.level ?? '-'}</span>❤️ ${st.hp}</div>
     <div class="stats">
       <span>AD <b>${st.ad}</b></span><span>AP <b>${st.ap}</b></span><span>Vel. at. <b>${st.as}</b></span>
       <span>Armadura <b>${st.armor}</b></span><span>Res. mág. <b>${st.mr}</b></span><span>Celeridad <b>${st.haste}</b></span>
@@ -444,7 +468,7 @@ async function loadLive() {
     }).join('');
     const pic = p.championId ? `<img class="champ" src="${champImg(p.championId)}">` : '<span class="champ-empty"></span>';
     return `<li class="${p.isMe ? 'me' : ''} ${p.isDead ? 'dead' : ''}">${pic}
-      <div class="who"><div>${p.isMe ? 'Tú' : escapeHtml(p.name)} <small>Nv ${p.level}${p.isDead ? ` · ☠️ ${p.respawn}s` : ''}</small></div>
+      <div class="who"><div>${p.isMe ? 'Tú' : escapeHtml(p.name)} <small>Nv ${p.level}</small>${p.isDead ? ` <small>☠️ ${p.respawn} s</small>` : ''}</div>
         <div class="items">${items}</div></div>
       <div class="kda">${p.kills}/${p.deaths}/${p.assists}<small>${p.cs} CS</small></div></li>`;
   };
@@ -454,6 +478,101 @@ async function loadLive() {
     ? d.feed.map((f) => `<li class="${f.ally ? 'ally' : ''}"><small>${fmt(Math.floor(f.t))}</small>${escapeHtml(f.text)}</li>`).join('')
     : '<li class="ally"><small>—</small>Todavía no pasa nada</li>';
 }
+
+// ---------- Chat ----------
+const CHAT_PHASES = ['Lobby', 'Matchmaking', 'ReadyCheck', 'ChampSelect', 'WaitingForStats', 'PreEndOfGame', 'EndOfGame'];
+const CHAT_TITLE = { championSelect: 'Chat de selección', postGame: 'Chat de fin de partida' };
+let chatOpen = false;
+let chatMsgs = [];
+let chatSeen = null;   // último mensaje visto
+let chatPhase = null;
+let chatBusy = false;
+
+function updateChat(phase) {
+  if (!CHAT_PHASES.includes(phase)) {
+    $('chat-fab').hidden = true;
+    closeChat();
+    chatPhase = null;
+    return;
+  }
+  if (phase !== chatPhase) {
+    // Cada fase tiene su propio chat: empezar de cero sin contar el historial
+    chatPhase = phase;
+    chatMsgs = [];
+    chatSeen = null;
+  }
+  if (chatOpen || tickCount % 3 === 0) loadChat();
+}
+
+async function loadChat() {
+  if (chatBusy) return;
+  chatBusy = true;
+  try {
+    const d = await api('/chat');
+    if (!d.available) {
+      $('chat-fab').hidden = true;
+      closeChat();
+      return;
+    }
+    $('chat-title').textContent = CHAT_TITLE[d.type] || 'Chat del lobby';
+    const prevLast = chatMsgs.at(-1)?.id;
+    chatMsgs = d.messages;
+    const last = chatMsgs.at(-1)?.id ?? '';
+    if (chatSeen === null) chatSeen = last;
+    if (chatOpen) {
+      chatSeen = last;
+      if (prevLast !== last || !$('chat-list').children.length) renderChat();
+    }
+    const seenAt = chatMsgs.findIndex((m) => m.id === chatSeen);
+    const unread = chatMsgs.slice(seenAt + 1).filter((m) => !m.mine && !m.system).length;
+    $('chat-badge').hidden = !unread;
+    $('chat-badge').textContent = unread > 9 ? '9+' : unread;
+    $('chat-fab').hidden = chatOpen;
+  } catch { /* el chat es secundario: no mostrar errores */ }
+  finally { chatBusy = false; }
+}
+
+function renderChat() {
+  const list = $('chat-list');
+  const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 60;
+  list.innerHTML = chatMsgs.length
+    ? chatMsgs.map((m) => (m.system
+      ? `<li class="system">${escapeHtml(m.body)}</li>`
+      : `<li class="${m.mine ? 'mine' : ''}"><div class="from">${escapeHtml(m.from)}</div><div class="bubble">${escapeHtml(m.body)}</div></li>`)).join('')
+    : '<li class="empty">Todavía no hay mensajes. Escribe el primero.</li>';
+  if (atBottom || !renderChat.done) list.scrollTop = list.scrollHeight;
+  renderChat.done = true;
+}
+
+function openChat() {
+  chatOpen = true;
+  renderChat.done = false;
+  $('chat-sheet').hidden = false;
+  $('chat-fab').hidden = true;
+  chatSeen = chatMsgs.at(-1)?.id ?? '';
+  $('chat-badge').hidden = true;
+  renderChat();
+  loadChat();
+}
+function closeChat() {
+  if (!chatOpen) return;
+  chatOpen = false;
+  $('chat-sheet').hidden = true;
+  $('chat-input').blur();
+}
+$('chat-fab').onclick = openChat;
+$('chat-close').onclick = () => { closeChat(); $('chat-fab').hidden = false; };
+$('chat-form').onsubmit = (e) => {
+  e.preventDefault();
+  const body = $('chat-input').value.trim();
+  if (!body) return;
+  run(async () => {
+    await api('/chat', { body });
+    $('chat-input').value = '';
+    renderChat.done = false;
+    await loadChat();
+  });
+};
 
 // ---------- Hechizos ----------
 function renderSpells() {
@@ -494,6 +613,7 @@ document.querySelectorAll('.tabs button').forEach((btn) => {
     document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('active', b === btn));
     ['champs', 'spells', 'runes'].forEach((t) => ($('tab-' + t).hidden = t !== btn.dataset.tab));
     $('champ-bar').hidden = btn.dataset.tab !== 'champs' || !lastState?.champSelect?.hasActions;
+    syncDock();
     if (btn.dataset.tab === 'runes') run(loadRunes);
   };
 });

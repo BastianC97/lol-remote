@@ -28,6 +28,8 @@ CÓMO USARLO
    - Elegir y banear campeones (en ARAM: banca, reroll e intercambios)
    - Cambiar hechizos de invocador y página de runas
    - Ver lo que eligió cada jugador
+   - Leer y escribir en el chat del lobby y de la selección
+     (botón redondo abajo a la derecha)
    - Ver las estadísticas durante la partida (marcador, objetivos,
      K/D/A, farm e ítems de cada jugador, y tu oro y stats)
 

@@ -107,6 +107,7 @@ function mount(app, { cfg, port }) {
       gameflow: await grab(() => lcu.get('/lol-gameflow/v1/session')),
       champSelect: await grab(() => lcu.get('/lol-champ-select/v1/session')),
       live: await grab(() => require('./live').summary()),
+      chats: await grab(async () => (await require('./chat').conversations()).map((c) => ({ id: c.id, type: c.type, name: c.name }))),
     };
     res.set('Content-Disposition', 'attachment; filename="lolremote-diagnostico.json"');
     res.json(data);
