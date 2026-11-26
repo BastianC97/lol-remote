@@ -140,18 +140,24 @@ async function tick() {
   const entered = state.phase !== prevPhase;
   prevPhase = state.phase;
 
+  if (state.phase !== 'Lobby') { $('lobby-box').hidden = true; $('leader-hint').hidden = true; }
+
   switch (state.phase) {
     case 'None':
       $('idle-text').textContent = 'Crea un lobby en el PC y desde aquí podrás buscar partida.';
       $('queue-start').hidden = $('queue-stop').hidden = true;
       showView('idle-view');
       break;
-    case 'Lobby':
+    case 'Lobby': {
       $('idle-text').textContent = state.queueName ? `Lobby de ${state.queueName}` : 'En lobby';
-      $('queue-start').hidden = false;
+      const lb = state.lobby;
+      $('queue-start').hidden = !!lb && !lb.isLeader;
+      $('leader-hint').hidden = !lb || lb.isLeader;
       $('queue-stop').hidden = true;
+      renderLobby(lb);
       showView('idle-view');
       break;
+    }
     case 'Matchmaking': {
       const t = Math.floor(state.search?.timeInQueue || 0);
       const est = Math.floor(state.search?.estimatedQueueTime || 0);
@@ -477,6 +483,71 @@ async function loadLive() {
   $('live-feed').innerHTML = d.feed.length
     ? d.feed.map((f) => `<li class="${f.ally ? 'ally' : ''}"><small>${fmt(Math.floor(f.t))}</small>${escapeHtml(f.text)}</li>`).join('')
     : '<li class="ally"><small>—</small>Todavía no pasa nada</li>';
+}
+
+// ---------- Lobby: línea ----------
+const ROLES = [['TOP', 'Top'], ['JUNGLE', 'Jungla'], ['MIDDLE', 'Mid'], ['BOTTOM', 'ADC'], ['UTILITY', 'Support'], ['FILL', 'Cualquiera']];
+const ROLE_NAME = Object.fromEntries(ROLES);
+let lobbyPos = { first: '', second: '' };
+let posBusy = false;
+
+document.querySelectorAll('.roles').forEach((box) => {
+  box.innerHTML = ROLES.map(([v, label]) => `<button data-role="${v}">${label}</button>`).join('');
+  box.onclick = (e) => {
+    const b = e.target.closest('[data-role]');
+    if (!b || b.disabled) return;
+    choosePosition(box.dataset.pref, b.dataset.role);
+  };
+});
+
+function renderLobby(lb) {
+  $('lobby-box').hidden = !lb;
+  if (!lb) return;
+  $('positions').hidden = !lb.canPickPositions;
+  if (!posBusy) lobbyPos = { first: lb.first, second: lb.second };
+  paintRoles();
+
+  $('party').innerHTML = lb.members.length > 1 || lb.canPickPositions
+    ? lb.members.map((m) => {
+      const roles = lb.canPickPositions
+        ? [m.first, m.second].filter(Boolean).map((r) => ROLE_NAME[r] || r).join(' y ') || 'Sin línea'
+        : '';
+      return `<li class="${m.isMe ? 'me' : ''}"><span>${m.isMe ? 'Tú' : escapeHtml(m.name || 'Jugador')}${m.isLeader ? ' 👑' : ''}</span><small>${escapeHtml(roles)}</small></li>`;
+    }).join('')
+    : '';
+}
+
+function paintRoles() {
+  const { first, second } = lobbyPos;
+  document.querySelectorAll('.roles[data-pref="first"] button').forEach((b) => b.classList.toggle('sel', b.dataset.role === first));
+  document.querySelectorAll('.roles[data-pref="second"] button').forEach((b) => {
+    b.classList.toggle('sel', b.dataset.role === second);
+    b.disabled = b.dataset.role === first; // no puede repetir la principal
+  });
+  // Con "Cualquiera" de principal no hay secundaria
+  $('second-wrap').hidden = !first || first === 'FILL';
+}
+
+function choosePosition(pref, role) {
+  const next = { ...lobbyPos };
+  if (pref === 'first') {
+    if (role === next.second) next.second = next.first && next.first !== 'FILL' ? next.first : '';
+    next.first = role;
+    if (role === 'FILL') next.second = '';
+  } else {
+    next.second = role;
+  }
+  lobbyPos = next;
+  paintRoles();
+  posBusy = true;
+  run(async () => {
+    try {
+      await api('/positions', { first: next.first || 'UNSELECTED', second: next.second || 'UNSELECTED' });
+    } finally {
+      // Dar un momento al cliente antes de volver a leer su estado
+      setTimeout(() => { posBusy = false; }, 1200);
+    }
+  });
 }
 
 // ---------- Chat ----------

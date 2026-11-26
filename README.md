@@ -48,6 +48,7 @@ Las peticiones usan Basic Auth con usuario `riot` y esa contraseña. El certific
 | `POST /api/accept` | `POST /lol-matchmaking/v1/ready-check/accept` | Aceptar partida |
 | `POST /api/decline` | `POST /lol-matchmaking/v1/ready-check/decline` | Rechazar partida |
 | `POST /api/queue/start` / `stop` | `/lol-lobby/v2/lobby/matchmaking/search` | Buscar o cancelar la búsqueda |
+| `POST /api/positions` | `PUT /lol-lobby/v1/lobby/members/localMember/position-preferences` | Línea principal y secundaria en el lobby (solo si `gameConfig.showPositionSelector`) |
 | `POST /api/champ` | `PATCH /lol-champ-select/v1/session/actions/{id}` | Hover, pick o ban (`completed: true` confirma) |
 | `POST /api/spells` | `PATCH /lol-champ-select/v1/session/my-selection` | Hechizos de invocador |
 | `GET/POST /api/runes` | `/lol-perks/v1/pages`, `PUT /lol-perks/v1/currentpage` | Ver y elegir página de runas |

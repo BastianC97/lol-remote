@@ -40,10 +40,25 @@
     <!-- Menú / lobby / buscando -->
     <section id="idle-view" class="panel center" hidden>
       <p id="idle-text" class="lead"></p>
+
+      <!-- Lobby: línea y grupo -->
+      <div id="lobby-box" hidden>
+        <div id="positions" class="positions" hidden>
+          <h3>Línea principal</h3>
+          <div class="roles" data-pref="first"></div>
+          <div id="second-wrap">
+            <h3>Línea secundaria</h3>
+            <div class="roles" data-pref="second"></div>
+          </div>
+        </div>
+        <ul id="party" class="party"></ul>
+      </div>
+
       <div class="actions">
         <button id="queue-start" class="btn primary wide" hidden>Buscar partida</button>
         <button id="queue-stop" class="btn ghost wide" hidden>Cancelar búsqueda</button>
       </div>
+      <p id="leader-hint" class="hint" hidden>Solo el líder del grupo puede buscar partida.</p>
     </section>
 
     <!-- Partida encontrada -->

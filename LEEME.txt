@@ -24,6 +24,8 @@ CÓMO USARLO
    aunque tengas el celular bloqueado.
 
 5. ¡Listo! En el celular puedes:
+   - Elegir tu línea principal y secundaria en el lobby
+     (en los modos que lo permiten, como Clasificatoria)
    - Buscar partida y aceptarla
    - Elegir y banear campeones (en ARAM: banca, reroll e intercambios)
    - Cambiar hechizos de invocador y página de runas

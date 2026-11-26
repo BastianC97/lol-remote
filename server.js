@@ -74,6 +74,11 @@ app.get('/api/state', handle(async () => {
   state.gameMode = flow?.gameData?.queue?.gameMode || null;
   state.queueName = flow?.gameData?.queue?.description || null;
 
+  if (phase === 'Lobby') {
+    const lobby = await lcu.get('/lol-lobby/v2/lobby');
+    if (lobby) state.lobby = summarizeLobby(lobby);
+  }
+
   if (phase === 'Matchmaking') {
     const s = await lcu.get('/lol-matchmaking/v1/search');
     state.search = s && { timeInQueue: s.timeInQueue, estimatedQueueTime: s.estimatedQueueTime };
@@ -93,6 +98,26 @@ app.get('/api/state', handle(async () => {
 
   return state;
 }));
+
+// Lobby: grupo, líneas elegidas y si el modo permite elegir línea
+function summarizeLobby(l) {
+  const meM = l.localMember || {};
+  const pos = (v) => (v && v !== 'UNSELECTED' ? v : '');
+  return {
+    // El cliente avisa si este modo usa selección de línea
+    canPickPositions: !!l.gameConfig?.showPositionSelector,
+    isLeader: !!meM.isLeader,
+    first: pos(meM.firstPositionPreference),
+    second: pos(meM.secondPositionPreference),
+    members: (l.members || []).map((m) => ({
+      name: m.gameName || m.summonerName || '',
+      isMe: m.puuid ? m.puuid === meM.puuid : m.summonerId === meM.summonerId,
+      isLeader: !!m.isLeader,
+      first: pos(m.firstPositionPreference),
+      second: pos(m.secondPositionPreference),
+    })),
+  };
+}
 
 // Reduce la sesión de selección (muy grande) a lo que la web necesita
 function summarizeSession(s) {
@@ -232,6 +257,19 @@ app.post('/api/accept', handle(() => act('POST', '/lol-matchmaking/v1/ready-chec
 app.post('/api/decline', handle(() => act('POST', '/lol-matchmaking/v1/ready-check/decline')));
 app.post('/api/queue/start', handle(() => act('POST', '/lol-lobby/v2/lobby/matchmaking/search')));
 app.post('/api/queue/stop', handle(() => act('DELETE', '/lol-lobby/v2/lobby/matchmaking/search')));
+
+// Línea en el lobby: { first, second } con TOP, JUNGLE, MIDDLE, BOTTOM, UTILITY o FILL
+const POSITIONS = ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY', 'FILL', 'UNSELECTED'];
+app.post('/api/positions', handle((req) => {
+  const first = String(req.body?.first || 'UNSELECTED');
+  let second = String(req.body?.second || 'UNSELECTED');
+  if (!POSITIONS.includes(first) || !POSITIONS.includes(second)) throw new Error('Línea inválida');
+  if (first === 'FILL' || second === first) second = 'UNSELECTED';
+  return act('PUT', '/lol-lobby/v1/lobby/members/localMember/position-preferences', {
+    firstPreference: first,
+    secondPreference: second,
+  });
+}));
 
 // Elegir campeón: { championId, lock }
 //  - Si es mi turno: marca el campeón y, si lock=true, lo confirma.
