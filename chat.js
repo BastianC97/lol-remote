@@ -22,21 +22,73 @@ async function activeConversation(phase) {
     || null;
 }
 
-// Nombres de quienes escriben (lobby, selección y amigos)
-async function nameMap() {
-  const map = new Map();
-  const add = (id, name) => { if (id && name) map.set(String(id), name); };
+// ---------- Nombres de quienes escriben ----------
+// Según la versión del cliente, un mensaje identifica a quien escribe con
+// fromSummonerId, fromPid o fromId ("<puuid>@servidor"). Juntamos todos los
+// identificadores que conocemos de cada jugador para encontrar su nombre.
 
-  const lobby = await lcu.get('/lol-lobby/v2/lobby').catch(() => null);
-  for (const m of lobby?.members || []) add(m.summonerId, m.gameName || m.summonerName);
+const known = new Map(); // cualquier id -> nombre (se recuerda entre llamadas)
+const failed = new Set(); // ids que ya preguntamos sin éxito
 
-  const cs = await lcu.get('/lol-champ-select/v1/session').catch(() => null);
-  for (const p of cs?.myTeam || []) add(p.summonerId, p.gameName || p.summonerName);
+const displayName = (o) => {
+  const n = o?.gameName || o?.summonerName || o?.name || o?.displayName || '';
+  return String(n).trim();
+};
 
-  const friends = await lcu.get('/lol-chat/v1/friends').catch(() => null);
-  for (const f of friends || []) add(f.summonerId, f.gameName || f.name);
+function remember(obj) {
+  const name = displayName(obj);
+  if (!name) return;
+  for (const id of [obj.summonerId, obj.puuid, obj.pid, obj.id]) {
+    if (!id) continue;
+    known.set(String(id), name);
+    // "<puuid>@la1.pvp.net" -> también por el puuid solo
+    const local = String(id).split('@')[0];
+    if (local) known.set(local, name);
+  }
+}
 
-  return map;
+function senderKeys(m) {
+  const keys = [m.fromSummonerId, m.fromPid, m.fromId, m.fromObfuscatedId]
+    .filter((k) => k && k !== 0 && k !== '0')
+    .map(String);
+  for (const k of [...keys]) if (k.includes('@')) keys.push(k.split('@')[0]);
+  return keys;
+}
+
+async function refreshNames(convId) {
+  const sources = await Promise.all([
+    lcu.get(`/lol-chat/v1/conversations/${encodeURIComponent(convId)}/participants`).catch(() => null),
+    lcu.get('/lol-lobby/v2/lobby').then((l) => l?.members).catch(() => null),
+    lcu.get('/lol-champ-select/v1/session').then((s) => s?.myTeam).catch(() => null),
+    lcu.get('/lol-chat/v1/friends').catch(() => null),
+  ]);
+  for (const list of sources) for (const o of list || []) remember(o);
+}
+
+// Último recurso: preguntarle al cliente por ese jugador
+async function lookup(keys) {
+  for (const k of keys) {
+    if (failed.has(k)) continue;
+    let s = null;
+    if (/^[0-9a-f-]{36,}$/i.test(k)) {
+      s = await lcu.get(`/lol-summoner/v2/summoners/puuid/${encodeURIComponent(k)}`).catch(() => null);
+    } else if (/^\d+$/.test(k)) {
+      s = await lcu.get(`/lol-summoner/v1/summoners/${k}`).catch(() => null);
+    }
+    const name = displayName(s);
+    if (name) {
+      for (const kk of keys) known.set(kk, name);
+      return name;
+    }
+    failed.add(k);
+  }
+  return null;
+}
+
+async function nameFor(m) {
+  const keys = senderKeys(m);
+  for (const k of keys) if (known.has(k)) return known.get(k);
+  return lookup(keys);
 }
 
 let meCache = null;
@@ -49,22 +101,24 @@ async function read(phase) {
   const conv = await activeConversation(phase);
   if (!conv) return { available: false, messages: [] };
 
-  const [msgs, names, self] = await Promise.all([
+  const [msgs, self] = await Promise.all([
     lcu.get(`/lol-chat/v1/conversations/${encodeURIComponent(conv.id)}/messages`).catch(() => []),
-    nameMap(),
     me(),
+    refreshNames(conv.id),
   ]);
+  const myKeys = new Set(senderKeys({ fromSummonerId: self.summonerId, fromPid: self.pid, fromId: self.id })
+    .concat(self.puuid ? [String(self.puuid)] : []));
 
-  const messages = (msgs || []).slice(-60).map((m) => {
-    const mine = (self.summonerId && String(m.fromSummonerId) === String(self.summonerId))
-      || (self.id && m.fromId === self.id);
-    const from = mine ? 'Tú' : names.get(String(m.fromSummonerId)) || 'Jugador';
+  const messages = [];
+  for (const m of (msgs || []).slice(-60)) {
+    const mine = senderKeys(m).some((k) => myKeys.has(k));
+    const from = mine ? 'Tú' : (await nameFor(m)) || 'Jugador';
     let body = m.body;
     let system = m.type === 'system';
     if (system && body === 'joined_room') body = `${from} se unió al chat`;
     else if (system && body === 'left_room') body = `${from} salió del chat`;
-    return { id: m.id, from, mine, system, body, time: m.timestamp };
-  });
+    messages.push({ id: m.id, from, mine, system, body, time: m.timestamp });
+  }
 
   return { available: true, type: conv.type, messages };
 }
@@ -87,4 +141,12 @@ async function conversations() {
   return (await lcu.get('/lol-chat/v1/conversations')) || [];
 }
 
-module.exports = { read, send, conversations };
+// Para el diagnóstico: de quién son los últimos mensajes (sin su texto)
+async function sample(phase) {
+  const conv = await activeConversation(phase);
+  if (!conv) return null;
+  const msgs = (await lcu.get(`/lol-chat/v1/conversations/${encodeURIComponent(conv.id)}/messages`).catch(() => [])) || [];
+  return msgs.slice(-5).map(({ body, ...rest }) => ({ ...rest, body: '(oculto)' }));
+}
+
+module.exports = { read, send, conversations, sample };

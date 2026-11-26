@@ -1,6 +1,6 @@
 {
   "name": "lol-remote",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Controla la selecci\u00f3n de campeones de League of Legends desde tu celular",
   "main": "server.js",
   "scripts": {
